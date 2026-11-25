@@ -1,0 +1,47 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Files for the ART/Dalvik VM
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+.cxx/
+
+# Gradle & Kotlin caches
+.gradle/
+.kotlin/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Local configuration & signing secrets
+local.properties
+keystore.properties
+keystore/
+*.jks
+*.keystore
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+captures/
+.navigation/
+output.json
+*.hprof
+
+# Android Profiling
+*.trace
+
+# Logs & OS files
+*.log
+.DS_Store
+.AppleDouble
+.LSOverride
+._*

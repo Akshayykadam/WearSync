@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">WearSync</string>
+    <string name="service_title">WearSync Active</string>
+    <string name="service_waiting">Waiting for iPhone connection</string>
+    <string name="service_connected">Connected to %1$s</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_discovering">Syncing ANCS…</string>
+    <string name="status_scanning">Scanning…</string>
+    <string name="status_pairing">Pairing…</string>
+    <string name="action_disconnect">Disconnect</string>
+    <string name="action_connect">Connect</string>
+    <string name="action_find_iphone">Find iPhone</string>
+    <string name="connect_devices_title">Connect Devices</string>
+</resources>

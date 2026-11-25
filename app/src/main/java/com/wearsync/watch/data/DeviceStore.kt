@@ -14,7 +14,7 @@ data class SavedDeviceRecord(
 data class SyncSettings(
     val vibrateEnabled: Boolean = true,
     val popupAlertsEnabled: Boolean = true,
-    val singleDrawerCard: Boolean = true,
+    val singleDrawerCard: Boolean = false,
     val syncPreExisting: Boolean = false,
     val syncDismissToIphone: Boolean = true,
     val discoverableEnabled: Boolean = true
@@ -140,8 +140,8 @@ class DeviceStore(context: Context) {
     fun getSettings(): SyncSettings = SyncSettings(
         vibrateEnabled = prefs.getBoolean(KEY_VIBRATE, true),
         popupAlertsEnabled = prefs.getBoolean(KEY_POPUP_ALERTS, true),
-        // Enforce single unstacked drawer notification and live alerts only (no settings drawer panel)
-        singleDrawerCard = true,
+        // Keep multiple drawer cards per app so consecutive messages (e.g. WhatsApp) remain visible
+        singleDrawerCard = false,
         syncPreExisting = false,
         syncDismissToIphone = prefs.getBoolean(KEY_SYNC_DISMISS, true),
         discoverableEnabled = prefs.getBoolean(KEY_DISCOVERABLE, true)

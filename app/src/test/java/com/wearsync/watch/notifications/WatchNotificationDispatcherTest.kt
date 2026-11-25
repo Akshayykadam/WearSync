@@ -9,6 +9,7 @@ import com.wearsync.watch.ancs.AncsParser
 import com.wearsync.watch.ancs.DataSourceParseResult
 import com.wearsync.watch.data.SyncSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,8 +29,18 @@ class WatchNotificationDispatcherTest {
     }
 
     @Test
-    fun syncSettings_defaultsToSingleDrawerCard() {
-        assertTrue(SyncSettings().singleDrawerCard)
+    fun syncSettings_defaultsToMultiDrawerCards() {
+        assertFalse(SyncSettings().singleDrawerCard)
+    }
+
+    @Test
+    fun uidSystemIds_areDistinctAcrossMultipleMessagesFromSameApp() {
+        val uids = listOf(101, 102, 103, 104)
+        val systemIds = uids.map { WatchNotificationDispatcher.computeUidSystemId(it) }
+        assertEquals(uids.size, systemIds.toSet().size)
+        systemIds.forEach { id ->
+            assertNotEquals(WatchNotificationDispatcher.SERVICE_NOTIFICATION_ID, id)
+        }
     }
 
     @Test
@@ -43,9 +54,9 @@ class WatchNotificationDispatcherTest {
             "com.apple.MobileSMS"
         )
         apps.forEach { appTag ->
-            val id = computeAppSystemId(appTag)
+            val id = WatchNotificationDispatcher.computeAppSystemId(appTag)
             assertNotEquals(WatchNotificationDispatcher.SERVICE_NOTIFICATION_ID, id)
-            assertEquals(id, computeAppSystemId(appTag))
+            assertEquals(id, WatchNotificationDispatcher.computeAppSystemId(appTag))
         }
     }
 
@@ -77,11 +88,5 @@ class WatchNotificationDispatcherTest {
         val result = parser.appendDataSourceChunk(validPacket, target)
         assertTrue(result is DataSourceParseResult.NotificationAttributesReady)
         assertEquals("net.whatsapp.WhatsApp", (result as DataSourceParseResult.NotificationAttributesReady).notification.appIdentifier)
-    }
-
-    private fun computeAppSystemId(appTag: String): Int {
-        val positive = (appTag.hashCode() and 0x7FFFFFFF) % 900_000
-        val id = positive + 2000
-        return if (id == WatchNotificationDispatcher.SERVICE_NOTIFICATION_ID) 500_001 else id
     }
 }

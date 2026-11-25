@@ -52,6 +52,18 @@ class WatchNotificationDispatcher(private val context: Context) {
         private const val DUPLICATE_SUPPRESS_WINDOW_MS = 120_000L
         private const val MAX_MULTI_DRAWER_CARDS = 45
         private const val EXTRA_CONTENT_HASH = "wearsync_content_hash"
+
+        internal fun computeAppSystemId(appTag: String): Int {
+            val positive = (appTag.hashCode() and 0x7FFFFFFF) % 900_000
+            val id = positive + 2000
+            return if (id == SERVICE_NOTIFICATION_ID) TEST_NOTIF_OFFSET + 1 else id
+        }
+
+        internal fun computeUidSystemId(uid: Int): Int {
+            val positive = (uid and 0x7FFFFFFF) % 900_000
+            val id = positive + 2000
+            return if (id == SERVICE_NOTIFICATION_ID) TEST_NOTIF_OFFSET + 1 else id
+        }
     }
 
     fun ensureChannels() {
@@ -224,7 +236,7 @@ class WatchNotificationDispatcher(private val context: Context) {
                 activeNotifs = activeNotifs
             )
         } else {
-            enforceMultiCardCap(MAX_MULTI_DRAWER_CARDS, activeNotifs)
+            enforceMultiCardCap(MAX_MULTI_DRAWER_CARDS, appTag, systemId, activeNotifs)
         }
 
         val isSilent = notif.eventFlags.isSilent || notif.eventFlags.isPreExisting
@@ -249,7 +261,7 @@ class WatchNotificationDispatcher(private val context: Context) {
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(
             context,
-            systemId + 10_000,
+            systemId * 10 + 4,
             alertActivityIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -294,8 +306,9 @@ class WatchNotificationDispatcher(private val context: Context) {
             .setShowWhen(true)
 
         if (!settings.singleDrawerCard) {
+            // Unique group per UID avoids broken summary-less groups and prevents Android auto-bundling
             builder
-                .setGroup("wearsync:$appTag:$title")
+                .setGroup("wearsync:$appTag:${notif.uid}")
                 .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_ALL)
         }
 
@@ -474,12 +487,18 @@ class WatchNotificationDispatcher(private val context: Context) {
 
     private fun enforceMultiCardCap(
         maxActive: Int,
+        incomingTag: String,
+        incomingSystemId: Int,
         activeNotifs: Array<android.service.notification.StatusBarNotification>? = null
     ) {
         val nm = systemNm ?: return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         val mirrored = (activeNotifs ?: nm.activeNotifications)
-            .filter { it.id != SERVICE_NOTIFICATION_ID && (it.notification.flags and Notification.FLAG_GROUP_SUMMARY) == 0 }
+            .filter {
+                it.id != SERVICE_NOTIFICATION_ID &&
+                    (it.notification.flags and Notification.FLAG_GROUP_SUMMARY) == 0 &&
+                    !(it.tag == incomingTag && it.id == incomingSystemId)
+            }
             .sortedBy { it.postTime }
         val excess = mirrored.size - (maxActive - 1)
         if (excess > 0) {
@@ -545,17 +564,9 @@ class WatchNotificationDispatcher(private val context: Context) {
         )
     }
 
-    internal fun mapAppToSystemId(appTag: String): Int {
-        val positive = (appTag.hashCode() and 0x7FFFFFFF) % 900_000
-        val id = positive + 2000
-        return if (id == SERVICE_NOTIFICATION_ID) TEST_NOTIF_OFFSET + 1 else id
-    }
+    internal fun mapAppToSystemId(appTag: String): Int = computeAppSystemId(appTag)
 
-    internal fun mapUidToSystemId(uid: Int): Int {
-        val positive = (uid and 0x7FFFFFFF) % 900_000
-        val id = positive + 2000
-        return if (id == SERVICE_NOTIFICATION_ID) TEST_NOTIF_OFFSET + 1 else id
-    }
+    internal fun mapUidToSystemId(uid: Int): Int = computeUidSystemId(uid)
 
     private fun androidCategoryFor(category: AncsCategoryId): String {
         return when (category) {

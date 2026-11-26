@@ -37,7 +37,7 @@ fun ConnectDevicesScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(WearSyncColors.Background)
-            .padding(top = 20.dp, bottom = 36.dp),
+            .padding(top = 24.dp, bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -55,9 +55,9 @@ fun ConnectDevicesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
-            contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp)
+            contentPadding = PaddingValues(top = 4.dp, bottom = 8.dp)
         ) {
             if (devices.isEmpty()) {
                 item(key = "empty") {

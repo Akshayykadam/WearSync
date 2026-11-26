@@ -30,9 +30,11 @@ import androidx.core.content.ContextCompat
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.Text
 import com.wearsync.watch.R
+import com.wearsync.watch.ams.MediaPlaybackState
 import com.wearsync.watch.ancs.ConnectionStatus
 import com.wearsync.watch.presentation.screens.ActiveDeviceScreen
 import com.wearsync.watch.presentation.screens.ConnectDevicesScreen
+import com.wearsync.watch.presentation.screens.MusicControlScreen
 import com.wearsync.watch.presentation.theme.WearSyncColors
 import com.wearsync.watch.presentation.theme.WearSyncTheme
 import com.wearsync.watch.service.WearSyncService
@@ -43,7 +45,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val PAGE_HOME = 0
-        const val PAGE_CONNECT_DEVICES = 1
+        const val PAGE_MUSIC = 1
+        const val PAGE_CONNECT_DEVICES = 2
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,7 +120,7 @@ private fun WearSyncRoot(
 
 @Composable
 private fun WearSyncPagerScreen() {
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
 
     var service by remember { mutableStateOf(WearSyncService.activeInstance) }
@@ -141,6 +144,10 @@ private fun WearSyncPagerScreen() {
         ?: remember { mutableStateOf<String?>(null) })
     val devicesList by (bleManager?.devicesList?.collectAsState()
         ?: remember { mutableStateOf(emptyList()) })
+    val mediaState by (bleManager?.mediaState?.collectAsState()
+        ?: remember { mutableStateOf(MediaPlaybackState()) })
+    val phoneBatteryLevel by (bleManager?.phoneBatteryLevel?.collectAsState()
+        ?: remember { mutableStateOf<Int?>(null) })
 
     Box(
         modifier = Modifier
@@ -156,6 +163,8 @@ private fun WearSyncPagerScreen() {
                     deviceName = activeDeviceName,
                     connectionStatus = connectionState,
                     statusHint = statusHint,
+                    phoneBatteryLevel = phoneBatteryLevel,
+                    isMusicPlaying = mediaState.isPlaying,
                     onDisconnectClick = { bleManager?.disconnect(forgetActive = false) },
                     onReconnectClick = { bleManager?.reconnectActiveDevice() },
                     onForgetClick = {
@@ -163,6 +172,18 @@ private fun WearSyncPagerScreen() {
                     },
                     onFindIphoneClick = {
                         bleManager?.startScan()
+                        scope.launch { pagerState.animateScrollToPage(MainActivity.PAGE_CONNECT_DEVICES) }
+                    },
+                    onMusicClick = {
+                        scope.launch { pagerState.animateScrollToPage(MainActivity.PAGE_MUSIC) }
+                    }
+                )
+
+                MainActivity.PAGE_MUSIC -> MusicControlScreen(
+                    isConnected = connectionState == ConnectionStatus.CONNECTED,
+                    mediaState = mediaState,
+                    onCommand = { cmd -> bleManager?.sendMediaCommand(cmd) },
+                    onConnectClick = {
                         scope.launch { pagerState.animateScrollToPage(MainActivity.PAGE_CONNECT_DEVICES) }
                     }
                 )
@@ -184,7 +205,7 @@ private fun WearSyncPagerScreen() {
             }
         }
 
-        // Minimal 2-dot page indicator matching the two-panel UI
+        // Minimal 3-dot page indicator matching the three-panel UI
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -192,7 +213,7 @@ private fun WearSyncPagerScreen() {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            repeat(2) { index ->
+            repeat(3) { index ->
                 val isSelected = pagerState.currentPage == index
                 Box(
                     modifier = Modifier

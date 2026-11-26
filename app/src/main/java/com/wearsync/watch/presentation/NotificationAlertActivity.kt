@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.wearsync.watch.ancs.AncsCategoryId
 import com.wearsync.watch.presentation.components.NotificationAlertCard
+import com.wearsync.watch.presentation.screens.IncomingCallScreen
 import com.wearsync.watch.presentation.theme.WearSyncColors
 import com.wearsync.watch.presentation.theme.WearSyncTheme
 import com.wearsync.watch.service.WearSyncService
@@ -94,22 +95,36 @@ private fun AlertPopupHost(onFinish: () -> Unit) {
             modifier = Modifier.fillMaxSize()
         ) { index ->
             val notif = alerts.getOrNull(index) ?: return@HorizontalPager
-            NotificationAlertCard(
-                notification = notif,
-                showDismissButton = false,
-                onCardClick = {
-                    service?.hidePopupAlert(notif.uid)
-                    if (alerts.size <= 1) onFinish()
-                },
-                onDismiss = {
-                    service?.dismissPopupAlert(notif.uid)
-                    if (alerts.size <= 1) onFinish()
-                },
-                onPositiveAction = {
-                    service?.performNotificationAction(notif.uid, true)
-                    if (alerts.size <= 1) onFinish()
-                }
-            )
+            if (notif.categoryId == AncsCategoryId.INCOMING_CALL) {
+                IncomingCallScreen(
+                    notification = notif,
+                    onAccept = {
+                        service?.performNotificationAction(notif.uid, true)
+                        if (alerts.size <= 1) onFinish()
+                    },
+                    onDecline = {
+                        service?.performNotificationAction(notif.uid, false)
+                        if (alerts.size <= 1) onFinish()
+                    }
+                )
+            } else {
+                NotificationAlertCard(
+                    notification = notif,
+                    showDismissButton = false,
+                    onCardClick = {
+                        service?.hidePopupAlert(notif.uid)
+                        if (alerts.size <= 1) onFinish()
+                    },
+                    onDismiss = {
+                        service?.dismissPopupAlert(notif.uid)
+                        if (alerts.size <= 1) onFinish()
+                    },
+                    onPositiveAction = {
+                        service?.performNotificationAction(notif.uid, true)
+                        if (alerts.size <= 1) onFinish()
+                    }
+                )
+            }
         }
 
         if (alerts.size > 1) {

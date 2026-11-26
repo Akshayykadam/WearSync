@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.wearsync.watch.R
+import com.wearsync.watch.ancs.AncsCategoryId
 import com.wearsync.watch.ancs.AncsEventId
 import com.wearsync.watch.ancs.AncsNotification
 import com.wearsync.watch.ancs.ConnectionStatus
@@ -42,6 +43,7 @@ class WearSyncService : LifecycleService() {
     private var systemNm: NotificationManager? = null
     private var cachedVibrator: Vibrator? = null
     private var alertWakeLock: PowerManager.WakeLock? = null
+    @Volatile private var activeCallUid: Int? = null
 
     private val _settings = MutableStateFlow(SyncSettings())
     val settings = _settings.asStateFlow()
@@ -165,6 +167,7 @@ class WearSyncService : LifecycleService() {
         lifecycleScope.launch {
             bleManager.notificationsFlow.collect { notif ->
                 if (notif.eventId == AncsEventId.REMOVED) {
+                    stopCallRinging(notif.uid)
                     notificationDispatcher.dispatch(notif, _settings.value)
                     _recentNotifications.value = _recentNotifications.value.filterNot { it.uid == notif.uid }
                     _popupAlerts.value = _popupAlerts.value.filterNot { it.uid == notif.uid }
@@ -178,7 +181,7 @@ class WearSyncService : LifecycleService() {
 
                         if (!notif.eventFlags.isPreExisting && !notif.eventFlags.isSilent) {
                             triggerAlertFeedback(notif)
-                            if (_settings.value.popupAlertsEnabled) {
+                            if (_settings.value.popupAlertsEnabled || notif.categoryId == AncsCategoryId.INCOMING_CALL) {
                                 showPopupCard(notif)
                             }
                         }
@@ -218,21 +221,40 @@ class WearSyncService : LifecycleService() {
             return
         }
 
+        val isIncomingCall = notif.categoryId == AncsCategoryId.INCOMING_CALL
         // Briefly wake watch screen so incoming alerts appear immediately like native watch alerts
         try {
-            alertWakeLock?.acquire(3_500L)
+            alertWakeLock?.acquire(if (isIncomingCall) 30_000L else 3_500L)
         } catch (_: Exception) {
         }
 
         if (!_settings.value.vibrateEnabled) return
 
         try {
-            val pattern = if (notif.categoryId == com.wearsync.watch.ancs.AncsCategoryId.INCOMING_CALL) {
-                longArrayOf(0, 350, 220, 350, 220, 350)
+            if (isIncomingCall) {
+                activeCallUid = notif.uid
+                val ringPattern = longArrayOf(0, 400, 300, 400)
+                cachedVibrator?.vibrate(VibrationEffect.createWaveform(ringPattern, 0))
             } else {
-                longArrayOf(0, 180, 90, 180)
+                val pattern = longArrayOf(0, 180, 90, 180)
+                cachedVibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
             }
-            cachedVibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun stopCallRinging(uid: Int? = null) {
+        if (uid != null && activeCallUid != uid) return
+        if (activeCallUid == null && uid != null) return
+        activeCallUid = null
+        try {
+            cachedVibrator?.cancel()
+        } catch (_: Exception) {
+        }
+        try {
+            if (alertWakeLock?.isHeld == true) {
+                alertWakeLock?.release()
+            }
         } catch (_: Exception) {
         }
     }
@@ -258,6 +280,7 @@ class WearSyncService : LifecycleService() {
     }
 
     fun dismissNotification(uid: Int) {
+        stopCallRinging(uid)
         val target = _popupAlerts.value.firstOrNull { it.uid == uid }
             ?: _recentNotifications.value.firstOrNull { it.uid == uid }
         _popupAlerts.value = _popupAlerts.value.filterNot { it.uid == uid }
@@ -269,6 +292,7 @@ class WearSyncService : LifecycleService() {
     }
 
     fun clearPopupAlerts() {
+        stopCallRinging()
         _popupAlerts.value = emptyList()
     }
 
@@ -279,6 +303,7 @@ class WearSyncService : LifecycleService() {
     }
 
     fun performNotificationAction(uid: Int, isPositive: Boolean) {
+        stopCallRinging(uid)
         bleManager.performNotificationAction(uid, isPositive)
         notificationDispatcher.cancelByUid(uid)
         _popupAlerts.value = _popupAlerts.value.filterNot { it.uid == uid }
@@ -288,12 +313,7 @@ class WearSyncService : LifecycleService() {
     override fun onDestroy() {
         super.onDestroy()
         Log.i(TAG, "WearSyncService stopping")
-        try {
-            if (alertWakeLock?.isHeld == true) {
-                alertWakeLock?.release()
-            }
-        } catch (_: Exception) {
-        }
+        stopCallRinging()
         advertiserManager.stopAdvertising()
         bleManager.shutdown()
         activeInstance = null

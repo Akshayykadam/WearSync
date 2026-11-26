@@ -9,7 +9,12 @@ import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
+import com.wearsync.watch.ams.AmsConstants
+import com.wearsync.watch.ams.AmsParser
+import com.wearsync.watch.ams.AmsRemoteCommand
+import com.wearsync.watch.ams.MediaPlaybackState
 import com.wearsync.watch.ancs.*
+import com.wearsync.watch.complication.PhoneBatteryComplicationService
 import com.wearsync.watch.data.DeviceStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -32,6 +37,7 @@ class AncsBleManager(
 
     private val gattQueue = GattCommandQueue(scope)
     private val ancsParser = AncsParser()
+    private val amsParser = AmsParser()
 
     @Volatile private var bluetoothGatt: BluetoothGatt? = null
     @Volatile private var activeDevice: BluetoothDevice? = null
@@ -47,6 +53,12 @@ class AncsBleManager(
     private var dataSourceChar: BluetoothGattCharacteristic? = null
     private var notificationSourceChar: BluetoothGattCharacteristic? = null
     private var ancsServiceMissing = false
+
+    // AMS (Apple Media Service) characteristics
+    private var amsRemoteCommandChar: BluetoothGattCharacteristic? = null
+    private var amsEntityUpdateChar: BluetoothGattCharacteristic? = null
+    private var amsEntityAttributeChar: BluetoothGattCharacteristic? = null
+    private var pendingEntityAttrRead: Pair<Byte, Byte>? = null
 
     // Notification attribute request queue (processed one UID at a time)
     private val pendingAttributeUids = ArrayDeque<AncsNotification>()
@@ -88,6 +100,12 @@ class AncsBleManager(
 
     private val _alertsSyncedCount = MutableStateFlow(0)
     val alertsSyncedCount = _alertsSyncedCount.asStateFlow()
+
+    private val _mediaState = MutableStateFlow(MediaPlaybackState())
+    val mediaState = _mediaState.asStateFlow()
+
+    private val _phoneBatteryLevel = MutableStateFlow<Int?>(null)
+    val phoneBatteryLevel = _phoneBatteryLevel.asStateFlow()
 
     init {
         loadInitialSavedAndBondedDevices()
@@ -439,11 +457,32 @@ class AncsBleManager(
         }
     }
 
+    fun sendMediaCommand(command: AmsRemoteCommand) {
+        val gatt = bluetoothGatt ?: return
+        val rc = amsRemoteCommandChar ?: return
+        val writeType = if ((rc.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
+            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        } else {
+            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        }
+        gattQueue.enqueue("amsCommand-${command.name}") {
+            writeCharacteristicCompat(gatt, rc, byteArrayOf(command.id), writeType)
+        }
+    }
+
     private fun closeCurrentGattOnly() {
         gattQueue.clear()
         controlPointChar = null
         dataSourceChar = null
         notificationSourceChar = null
+        amsRemoteCommandChar = null
+        amsEntityUpdateChar = null
+        amsEntityAttributeChar = null
+        pendingEntityAttrRead = null
+        _mediaState.value = MediaPlaybackState()
+        _phoneBatteryLevel.value = null
+        deviceStore.setPhoneBatteryLevel(null)
+        PhoneBatteryComplicationService.requestUpdate(context)
         try {
             bluetoothGatt?.disconnect()
         } catch (_: Exception) {
@@ -617,7 +656,14 @@ class AncsBleManager(
                 _statusHint.value = null
                 _connectionState.value = ConnectionStatus.CONNECTED
                 refreshDevicesList()
+                PhoneBatteryComplicationService.requestUpdate(context)
                 Log.i(TAG, "ANCS fully subscribed and ready!")
+            }
+
+            if (status == BluetoothGatt.GATT_SUCCESS && charUuid == AmsConstants.ENTITY_UPDATE_UUID) {
+                _mediaState.value = _mediaState.value.copy(isAvailable = true)
+                registerAmsEntityUpdates(gatt)
+                Log.i(TAG, "AMS Entity Update subscribed; registering Player & Track attributes")
             }
         }
 
@@ -735,6 +781,76 @@ class AncsBleManager(
                 gatt.readCharacteristic(gapNameChar)
             }
         }
+
+        setupAmsSubscriptions(gatt)
+        setupBatterySubscription(gatt)
+    }
+
+    private fun setupBatterySubscription(gatt: BluetoothGatt) {
+        val batChar = gatt.getService(AncsConstants.BATTERY_SERVICE_UUID)
+            ?.getCharacteristic(AncsConstants.BATTERY_LEVEL_CHAR_UUID)
+            ?: return
+        gattQueue.enqueue("readPhoneBattery") {
+            gatt.readCharacteristic(batChar)
+        }
+        if (batChar.getDescriptor(AncsConstants.CCCD_UUID) != null) {
+            enqueueEnableCccd(gatt, batChar, "subscribe-PhoneBattery")
+        }
+    }
+
+    private fun setupAmsSubscriptions(gatt: BluetoothGatt) {
+        val amsService = gatt.getService(AmsConstants.AMS_SERVICE_UUID)
+        if (amsService == null) {
+            Log.d(TAG, "AMS service not exposed on ${safeDeviceName(gatt.device)}")
+            return
+        }
+
+        amsRemoteCommandChar = amsService.getCharacteristic(AmsConstants.REMOTE_COMMAND_UUID)
+        amsEntityUpdateChar = amsService.getCharacteristic(AmsConstants.ENTITY_UPDATE_UUID)
+        amsEntityAttributeChar = amsService.getCharacteristic(AmsConstants.ENTITY_ATTRIBUTE_UUID)
+
+        Log.i(
+            TAG,
+            "AMS chars: rc=${amsRemoteCommandChar != null} eu=${amsEntityUpdateChar != null} ea=${amsEntityAttributeChar != null}"
+        )
+
+        amsEntityUpdateChar?.let { eu ->
+            enqueueEnableCccd(gatt, eu, "subscribe-AmsEntityUpdate")
+        }
+        amsRemoteCommandChar?.let { rc ->
+            enqueueEnableCccd(gatt, rc, "subscribe-AmsRemoteCommand")
+        }
+    }
+
+    private fun registerAmsEntityUpdates(gatt: BluetoothGatt) {
+        val eu = amsEntityUpdateChar ?: return
+        val playerCmd = amsParser.buildRegisterEntityUpdateCommand(
+            AmsConstants.ENTITY_PLAYER,
+            AmsConstants.PLAYER_ATTR_NAME,
+            AmsConstants.PLAYER_ATTR_PLAYBACK_INFO,
+            AmsConstants.PLAYER_ATTR_VOLUME
+        )
+        val trackCmd = amsParser.buildRegisterEntityUpdateCommand(
+            AmsConstants.ENTITY_TRACK,
+            AmsConstants.TRACK_ATTR_ARTIST,
+            AmsConstants.TRACK_ATTR_ALBUM,
+            AmsConstants.TRACK_ATTR_TITLE,
+            AmsConstants.TRACK_ATTR_DURATION
+        )
+        val queueCmd = amsParser.buildRegisterEntityUpdateCommand(
+            AmsConstants.ENTITY_QUEUE,
+            AmsConstants.QUEUE_ATTR_SHUFFLE_MODE,
+            AmsConstants.QUEUE_ATTR_REPEAT_MODE
+        )
+        gattQueue.enqueue("amsRegisterPlayer") {
+            writeCharacteristicCompat(gatt, eu, playerCmd, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        }
+        gattQueue.enqueue("amsRegisterTrack") {
+            writeCharacteristicCompat(gatt, eu, trackCmd, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        }
+        gattQueue.enqueue("amsRegisterQueue") {
+            writeCharacteristicCompat(gatt, eu, queueCmd, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        }
     }
 
     private fun handleCharacteristicRead(
@@ -756,6 +872,31 @@ class AncsBleManager(
                 deviceStore.upsertSavedDevice(gatt.device.address, resolvedName)
                 refreshDevicesList()
             }
+        } else if (status == BluetoothGatt.GATT_SUCCESS && uuid == AmsConstants.ENTITY_ATTRIBUTE_UUID) {
+            val target = pendingEntityAttrRead
+            pendingEntityAttrRead = null
+            if (target != null) {
+                val fullValue = data.toString(Charsets.UTF_8)
+                _mediaState.value = amsParser.applyEntityUpdate(
+                    current = _mediaState.value,
+                    entityId = target.first,
+                    attributeId = target.second,
+                    value = fullValue
+                )
+            }
+        } else if (status == BluetoothGatt.GATT_SUCCESS && uuid == AncsConstants.BATTERY_LEVEL_CHAR_UUID) {
+            updatePhoneBatteryFromBytes(data)
+        }
+    }
+
+    private fun updatePhoneBatteryFromBytes(data: ByteArray) {
+        if (data.isEmpty()) return
+        val level = (data[0].toInt() and 0xFF).coerceIn(0, 100)
+        if (_phoneBatteryLevel.value != level) {
+            _phoneBatteryLevel.value = level
+            deviceStore.setPhoneBatteryLevel(level)
+            PhoneBatteryComplicationService.requestUpdate(context)
+            Log.d(TAG, "iPhone battery level: $level%")
         }
     }
 
@@ -865,6 +1006,43 @@ class AncsBleManager(
                         pumpNextControlPointRequest()
                     }
                 }
+            }
+
+            AmsConstants.REMOTE_COMMAND_UUID -> {
+                val cmds = amsParser.parseRemoteCommands(data)
+                _mediaState.value = _mediaState.value.copy(
+                    isAvailable = true,
+                    supportedCommands = cmds,
+                    lastUpdatedMs = System.currentTimeMillis()
+                )
+            }
+
+            AmsConstants.ENTITY_UPDATE_UUID -> {
+                val packet = amsParser.parseEntityUpdate(data) ?: return
+                _mediaState.value = amsParser.applyEntityUpdate(
+                    current = _mediaState.value,
+                    entityId = packet.entityId,
+                    attributeId = packet.attributeId,
+                    value = packet.value
+                )
+                if (packet.isTruncated) {
+                    val gatt = bluetoothGatt
+                    val ea = amsEntityAttributeChar
+                    if (gatt != null && ea != null) {
+                        val readReq = amsParser.buildEntityAttributeReadCommand(packet.entityId, packet.attributeId)
+                        gattQueue.enqueue("amsWriteEntityAttr") {
+                            writeCharacteristicCompat(gatt, ea, readReq, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+                        }
+                        gattQueue.enqueue("amsReadEntityAttr") {
+                            pendingEntityAttrRead = packet.entityId to packet.attributeId
+                            gatt.readCharacteristic(ea)
+                        }
+                    }
+                }
+            }
+
+            AncsConstants.BATTERY_LEVEL_CHAR_UUID -> {
+                updatePhoneBatteryFromBytes(data)
             }
         }
     }

@@ -26,17 +26,23 @@ fun ActiveDeviceScreen(
     deviceName: String?,
     connectionStatus: ConnectionStatus,
     statusHint: String?,
+    phoneBatteryLevel: Int? = null,
+    isMusicPlaying: Boolean = false,
     onDisconnectClick: () -> Unit,
     onReconnectClick: () -> Unit,
     onForgetClick: () -> Unit,
-    onFindIphoneClick: () -> Unit
+    onFindIphoneClick: () -> Unit,
+    onMusicClick: () -> Unit = {}
 ) {
     val hasDevice = !deviceName.isNullOrBlank()
     val displayTitle = deviceName ?: "No iPhone Paired"
 
     val (statusLabel, statusColor) = when {
         !hasDevice -> "Swipe to connect" to WearSyncColors.TextSecondary
-        connectionStatus == ConnectionStatus.CONNECTED -> "Connected" to WearSyncColors.StatusConnected
+        connectionStatus == ConnectionStatus.CONNECTED -> {
+            val suffix = phoneBatteryLevel?.let { " • $it%" } ?: ""
+            "Connected$suffix" to WearSyncColors.StatusConnected
+        }
         connectionStatus == ConnectionStatus.CONNECTING -> "Connecting…" to WearSyncColors.StatusConnecting
         connectionStatus == ConnectionStatus.DISCOVERING_SERVICES -> "Syncing ANCS…" to WearSyncColors.StatusConnecting
         connectionStatus == ConnectionStatus.PAIRING -> "Pairing…" to WearSyncColors.StatusConnecting
@@ -113,23 +119,46 @@ fun ActiveDeviceScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Box(
-            modifier = Modifier
-                .widthIn(min = 122.dp)
-                .height(42.dp)
-                .clip(CircleShape)
-                .background(WearSyncColors.PillSurface)
-                .clickable(onClick = buttonAction)
-                .padding(horizontal = 24.dp),
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = buttonLabel,
-                color = WearSyncColors.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
+            Box(
+                modifier = Modifier
+                    .widthIn(min = 122.dp)
+                    .height(42.dp)
+                    .clip(CircleShape)
+                    .background(WearSyncColors.PillSurface)
+                    .clickable(onClick = buttonAction)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = buttonLabel,
+                    color = WearSyncColors.TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
+
+            if (connectionStatus == ConnectionStatus.CONNECTED) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(WearSyncColors.PillSurfaceSecondary)
+                        .clickable(onClick = onMusicClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_music_note),
+                        contentDescription = "Music Control",
+                        tint = if (isMusicPlaying) WearSyncColors.StatusConnected else WearSyncColors.TextPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
 
         if (hasDevice && !isBusyOrConnected) {

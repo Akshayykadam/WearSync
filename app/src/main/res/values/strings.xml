@@ -13,4 +13,5 @@
     <string name="action_connect">Connect</string>
     <string name="action_find_iphone">Find iPhone</string>
     <string name="connect_devices_title">Connect Devices</string>
+    <string name="complication_iphone_battery">iPhone Battery</string>
 </resources>

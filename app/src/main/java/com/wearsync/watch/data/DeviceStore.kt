@@ -36,6 +36,7 @@ class DeviceStore(context: Context) {
         private const val KEY_SYNC_PRE_EXISTING = "pref_sync_pre_existing"
         private const val KEY_SYNC_DISMISS = "pref_sync_dismiss"
         private const val KEY_DISCOVERABLE = "pref_discoverable"
+        private const val KEY_PHONE_BATTERY = "phone_battery_level"
     }
 
     fun getActiveDeviceAddress(): String? = prefs.getString(KEY_ACTIVE_ADDRESS, null)
@@ -156,5 +157,15 @@ class DeviceStore(context: Context) {
             .putBoolean(KEY_SYNC_DISMISS, settings.syncDismissToIphone)
             .putBoolean(KEY_DISCOVERABLE, settings.discoverableEnabled)
             .apply()
+    }
+
+    fun getPhoneBatteryLevel(): Int? {
+        val raw = prefs.getInt(KEY_PHONE_BATTERY, -1)
+        return if (raw in 0..100) raw else null
+    }
+
+    fun setPhoneBatteryLevel(level: Int?) {
+        val stored = level?.coerceIn(0, 100) ?: -1
+        prefs.edit().putInt(KEY_PHONE_BATTERY, stored).apply()
     }
 }

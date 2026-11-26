@@ -5,6 +5,7 @@ coreKtx = "1.15.0"
 composeBom = "2024.11.00"
 composeWear = "1.4.0"
 wearMaterial = "1.4.0"
+watchfaceComplications = "1.2.1"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
 coroutines = "1.9.0"
@@ -25,6 +26,7 @@ androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 # Wear OS Compose
 androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearMaterial" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "composeWear" }
+androidx-wear-watchface-complications = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplications" }
 
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }

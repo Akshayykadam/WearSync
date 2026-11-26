@@ -107,7 +107,6 @@ class PhoneBatteryComplicationService : SuspendingComplicationDataSourceService(
                     contentDescription = PlainComplicationText.Builder(contentDesc).build()
                 )
                     .setText(PlainComplicationText.Builder(valueText).build())
-                    .setTitle(PlainComplicationText.Builder("iPhone").build())
                     .setMonochromaticImage(icon)
                     .setTapAction(tapPendingIntent)
                     .build()
@@ -118,7 +117,6 @@ class PhoneBatteryComplicationService : SuspendingComplicationDataSourceService(
                     text = PlainComplicationText.Builder(valueText).build(),
                     contentDescription = PlainComplicationText.Builder(contentDesc).build()
                 )
-                    .setTitle(PlainComplicationText.Builder("iPhone").build())
                     .setMonochromaticImage(icon)
                     .setTapAction(tapPendingIntent)
                     .build()

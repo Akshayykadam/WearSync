@@ -62,9 +62,10 @@ adb install app-release.apk
 
 ### 2. Pair with Your iPhone
 1. Open **WearSync** on your watch and allow **Nearby devices** and **Notifications** permissions.
-2. Swipe to **Connect Devices** and tap **Scan iPhone** (or select your watch in iPhone **Settings → Bluetooth**).
-3. Confirm the Bluetooth pairing code on both your watch and iPhone.
-4. **Important:** On your iPhone, open **Settings → Bluetooth**, tap the **(i)** icon next to your watch, and turn **Share System Notifications** **ON**.
+2. Swipe to **Connect Devices** and tap **Scan iPhone** on your watch.
+3. Open **Settings → Bluetooth** on your iPhone — you will see your watch in the list; tap it to **Connect**.
+4. Confirm the **Bluetooth pairing code** on both your watch and iPhone.
+5. **Important:** On your iPhone, open **Settings → Bluetooth**, tap the **(i)** icon next to your watch, and turn **Share System Notifications** **ON**.
 
 ### 3. Add the iPhone Battery Watch Face Complication (Optional)
 1. Long-press your Wear OS watch face and tap **Customize**.

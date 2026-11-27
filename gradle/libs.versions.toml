@@ -6,6 +6,9 @@ composeBom = "2024.11.00"
 composeWear = "1.4.0"
 wearMaterial = "1.4.0"
 watchfaceComplications = "1.2.1"
+wearTiles = "1.4.0"
+wearProtolayout = "1.2.0"
+concurrentFuturesKtx = "1.2.0"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
 coroutines = "1.9.0"
@@ -27,6 +30,10 @@ androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearMaterial" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "composeWear" }
 androidx-wear-watchface-complications = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplications" }
+androidx-wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "wearTiles" }
+androidx-wear-protolayout = { group = "androidx.wear.protolayout", name = "protolayout", version.ref = "wearProtolayout" }
+androidx-wear-protolayout-material = { group = "androidx.wear.protolayout", name = "protolayout-material", version.ref = "wearProtolayout" }
+androidx-concurrent-futures-ktx = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version.ref = "concurrentFuturesKtx" }
 
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }

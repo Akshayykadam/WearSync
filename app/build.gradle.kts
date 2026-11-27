@@ -82,6 +82,10 @@ dependencies {
     implementation("androidx.wear.compose:compose-material3:1.0.0-alpha28")
     implementation(libs.androidx.wear.compose.foundation)
     implementation(libs.androidx.wear.watchface.complications)
+    implementation(libs.androidx.wear.tiles)
+    implementation(libs.androidx.wear.protolayout)
+    implementation(libs.androidx.wear.protolayout.material)
+    implementation(libs.androidx.concurrent.futures.ktx)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)

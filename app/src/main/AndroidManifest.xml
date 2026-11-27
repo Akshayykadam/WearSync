@@ -85,6 +85,22 @@
                 android:value="900" />
         </service>
 
+        <!-- Wear OS Tile for iPhone Music Control -->
+        <service
+            android:name=".tile.MusicControlTileService"
+            android:description="@string/tile_music_control_desc"
+            android:exported="true"
+            android:icon="@drawable/ic_music_note"
+            android:label="@string/tile_music_control"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_music_note" />
+        </service>
+
         <!-- Notification Action & Swipe Dismiss Sync Receiver -->
         <receiver
             android:name=".notifications.NotificationActionReceiver"

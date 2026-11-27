@@ -16,6 +16,7 @@ import com.wearsync.watch.ams.MediaPlaybackState
 import com.wearsync.watch.ancs.*
 import com.wearsync.watch.complication.PhoneBatteryComplicationService
 import com.wearsync.watch.data.DeviceStore
+import com.wearsync.watch.tile.MusicControlTileService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -483,6 +484,7 @@ class AncsBleManager(
         _phoneBatteryLevel.value = null
         deviceStore.setPhoneBatteryLevel(null)
         PhoneBatteryComplicationService.requestUpdate(context)
+        MusicControlTileService.requestUpdate(context)
         try {
             bluetoothGatt?.disconnect()
         } catch (_: Exception) {
@@ -657,6 +659,7 @@ class AncsBleManager(
                 _connectionState.value = ConnectionStatus.CONNECTED
                 refreshDevicesList()
                 PhoneBatteryComplicationService.requestUpdate(context)
+                MusicControlTileService.requestUpdate(context)
                 Log.i(TAG, "ANCS fully subscribed and ready!")
             }
 
@@ -883,6 +886,7 @@ class AncsBleManager(
                     attributeId = target.second,
                     value = fullValue
                 )
+                MusicControlTileService.requestUpdate(context)
             }
         } else if (status == BluetoothGatt.GATT_SUCCESS && uuid == AncsConstants.BATTERY_LEVEL_CHAR_UUID) {
             updatePhoneBatteryFromBytes(data)
@@ -1015,6 +1019,7 @@ class AncsBleManager(
                     supportedCommands = cmds,
                     lastUpdatedMs = System.currentTimeMillis()
                 )
+                MusicControlTileService.requestUpdate(context)
             }
 
             AmsConstants.ENTITY_UPDATE_UUID -> {
@@ -1025,6 +1030,7 @@ class AncsBleManager(
                     attributeId = packet.attributeId,
                     value = packet.value
                 )
+                MusicControlTileService.requestUpdate(context)
                 if (packet.isTruncated) {
                     val gatt = bluetoothGatt
                     val ea = amsEntityAttributeChar
